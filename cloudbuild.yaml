@@ -1,0 +1,8 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-t', 'gcr.io/growforme-backend-465911/ussdtest', '.']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['push', 'gcr.io/growforme-backend-465911/ussdtest']
+serviceAccount: 'projects/growforme-backend-465911/serviceAccounts/234841079776-compute@developer.gserviceaccount.com'
+options:
+  logging: CLOUD_LOGGING_ONLY
