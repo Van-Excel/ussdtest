@@ -1,0 +1,103 @@
+version: "3.9"
+
+services:
+  fastapi:
+    build: .
+    container_name: fastapi_app
+    restart: always
+    depends_on:
+      - postgres
+      - redis-master
+    volumes:
+      - .:/app
+    ports:
+      - "8001:8000"
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/postgres
+      REDIS_URL: redis://redis-master:6379/0
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: ussd_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  adminer:
+    image: adminer:latest
+    container_name: adminer
+    restart: always
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+
+  redis-master:
+    image: redis:7.2
+    container_name: redis_master
+    command: redis-server --appendonly yes --replica-announce-ip redis-master
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_master_data:/data
+
+  redis-replica:
+    image: redis:7.2
+    container_name: redis_replica
+    command: redis-server --replicaof redis-master 6379 --replica-announce-ip redis-replica
+    depends_on:
+      - redis-master
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_replica_data:/data
+
+  redis-sentinel1:
+    image: redis:7.2
+    container_name: redis_sentinel1
+    depends_on:
+      - redis-master
+      - redis-replica
+    ports:
+      - "26379:26379"
+    command: >
+      redis-sentinel /etc/redis/sentinel.conf
+    volumes:
+      - ./redis/sentinel.conf:/etc/redis/sentinel.conf
+
+  redis-sentinel2:
+    image: redis:7.2
+    container_name: redis_sentinel2
+    depends_on:
+      - redis-master
+      - redis-replica
+    ports:
+      - "26380:26379"
+    command: >
+      redis-sentinel /etc/redis/sentinel.conf
+    volumes:
+      - ./redis/sentinel.conf:/etc/redis/sentinel.conf
+
+  redis-sentinel3:
+    image: redis:7.2
+    container_name: redis_sentinel3
+    depends_on:
+      - redis-master
+      - redis-replica
+    ports:
+      - "26381:26379"
+    command: >
+      redis-sentinel /etc/redis/sentinel.conf
+    volumes:
+      - ./redis/sentinel.conf:/etc/redis/sentinel.conf
+
+volumes:
+  postgres_data:
+  redis_master_data:
+  redis_replica_data:
