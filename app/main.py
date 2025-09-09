@@ -5,7 +5,10 @@ from fastapi import FastAPI
 app = FastAPI()
 
 # Direct connection to Redis master (later we’ll switch to Sentinel)
-redis_client = redis.Redis(host="redis-master", port=6379, db=0)
+# redis_client = redis.Redis(host="redis-master", port=6379, db=0)
+redis_host = os.getenv("REDIS_HOST", "localhost")
+redis_port = int(os.getenv("REDIS_PORT", 6379))
+redis_client = redis.Redis(host=redis_host, port=redis_port, db=0)
 
 @app.get("/")
 def read_root():
