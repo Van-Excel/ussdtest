@@ -1,6 +1,7 @@
 import time
 import redis
 from fastapi import FastAPI
+import os
 
 app = FastAPI()
 
