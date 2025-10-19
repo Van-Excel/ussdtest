@@ -1,4 +1,3 @@
-version: "3.9"
 
 services:
   fastapi:
@@ -8,13 +7,20 @@ services:
     depends_on:
       - postgres
       - redis-master
+      - redis-replica
+      - redis-sentinel1
+      - redis-sentinel2
+      - redis-sentinel3
     volumes:
       - .:/app
     ports:
-      - "8001:8000"
+      - "8001:8080"
     environment:
       DATABASE_URL: postgres://postgres:postgres@postgres:5432/postgres
-      REDIS_URL: redis://redis-master:6379/0
+      REDIS_SENTINEL_HOSTS: redis-sentinel1:26379,redis-sentinel2:26380,redis-sentinel3:26381
+      REDIS_MASTER_NAME: mymaster
+    networks:
+      - monitoring_net
 
   postgres:
     image: postgres:17-alpine
@@ -28,6 +34,8 @@ services:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - monitoring_net
 
   adminer:
     image: adminer:latest
@@ -37,67 +45,109 @@ services:
       - "8080:8080"
     depends_on:
       - postgres
+    networks:
+      - monitoring_net
 
   redis-master:
     image: redis:7.2
     container_name: redis_master
-    command: redis-server --appendonly yes --replica-announce-ip redis-master
+    command: >
+      redis-server --appendonly yes --replica-announce-ip redis-master
     ports:
       - "6379:6379"
     volumes:
       - redis_master_data:/data
+    networks:
+      - monitoring_net
 
   redis-replica:
     image: redis:7.2
     container_name: redis_replica
-    command: redis-server --replicaof redis-master 6379 --replica-announce-ip redis-replica
+    command: >
+      redis-server --replicaof redis-master 6379 --replica-announce-ip redis-replica
     depends_on:
       - redis-master
     ports:
       - "6380:6379"
     volumes:
       - redis_replica_data:/data
+    networks:
+      - monitoring_net
 
   redis-sentinel1:
     image: redis:7.2
     container_name: redis_sentinel1
+    command: >
+      sh -c "sleep 5 && redis-sentinel /etc/redis/sentinel.conf"
+    volumes:
+      - ./redis/sentinel.conf:/etc/redis/sentinel.conf
+    ports:
+      - "26379:26379"
     depends_on:
       - redis-master
       - redis-replica
-    ports:
-      - "26379:26379"
-    command: >
-      redis-sentinel /etc/redis/sentinel.conf
-    volumes:
-      - ./redis/sentinel.conf:/etc/redis/sentinel.conf
+    networks:
+      - monitoring_net
 
   redis-sentinel2:
     image: redis:7.2
     container_name: redis_sentinel2
+    command: >
+      sh -c "sleep 5 && redis-sentinel /etc/redis/sentinel.conf"
+    volumes:
+      - ./redis/sentinel.conf:/etc/redis/sentinel.conf
+    ports:
+      - "26380:26379"
     depends_on:
       - redis-master
       - redis-replica
-    ports:
-      - "26380:26379"
-    command: >
-      redis-sentinel /etc/redis/sentinel.conf
-    volumes:
-      - ./redis/sentinel.conf:/etc/redis/sentinel.conf
+    networks:
+      - monitoring_net
 
   redis-sentinel3:
     image: redis:7.2
     container_name: redis_sentinel3
+    command: >
+      sh -c "sleep 5 && redis-sentinel /etc/redis/sentinel.conf"
+    volumes:
+      - ./redis/sentinel.conf:/etc/redis/sentinel.conf
+    ports:
+      - "26381:26379"
     depends_on:
       - redis-master
       - redis-replica
-    ports:
-      - "26381:26379"
-    command: >
-      redis-sentinel /etc/redis/sentinel.conf
+    networks:
+      - monitoring_net
+
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
     volumes:
-      - ./redis/sentinel.conf:/etc/redis/sentinel.conf
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    depends_on:
+      - fastapi
+    networks:
+      - monitoring_net
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - monitoring_net
 
 volumes:
   postgres_data:
   redis_master_data:
   redis_replica_data:
+  grafana_data:
+
+networks:
+  monitoring_net:
+    driver: bridge
